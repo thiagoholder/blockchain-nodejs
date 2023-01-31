@@ -1,10 +1,27 @@
-const ChainUtil = require('../chain-util');
+const ChainUtil = require("../chain-util");
 
 class Transaction {
   constructor() {
     this.id = ChainUtil.id();
     this.input = null;
     this.outputs = [];
+  }
+
+  update(senderWallet, recipient, amount) {
+    const senderOutput = this.outputs.find(
+      (output) => output.adress == senderWallet.publicKey
+    );
+    if (amount > senderOutput.amount) {
+      console.log(`Amount: ${amount} exceeds balance`);
+      return;
+    }
+
+    senderOutput.amount = senderOutput.amount - amount;
+    this.outputs.push({ amount, adress: recipient });
+
+    Transaction.signTransaction(this, senderWallet);
+
+    return this;
   }
 
   static newTransaction(senderWallet, recipient, amount) {
@@ -25,7 +42,26 @@ class Transaction {
       ]
     );
 
+    Transaction.signTransaction(transaction, senderWallet);
+
     return transaction;
+  }
+
+  static signTransaction(transaction, senderWallet) {
+    transaction.input = {
+      timestamp: Date.now(),
+      amount: senderWallet.balance,
+      adress: senderWallet.publicKey,
+      signature: senderWallet.sign(ChainUtil.hash(transaction.outputs)),
+    };
+  }
+
+  static verifyTransaction(transaction) {
+    return ChainUtil.verifySignature(
+      transaction.input.adress,
+      transaction.input.signature,
+      ChainUtil.hash(transaction.outputs)
+    );
   }
 }
 
